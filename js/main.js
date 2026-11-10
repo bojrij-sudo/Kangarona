@@ -1,3 +1,4 @@
+import { EnemyManager } from './enemies.js';
 // js/main.js
 import { gameConfig, GAME_CONSTANTS } from './config.js';
 
