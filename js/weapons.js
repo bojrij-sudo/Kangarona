@@ -1,5 +1,8 @@
+// js/weapons.js
+console.log('Weapons module loaded');
+
 // Типы патронов: у каждого — цвет HUD и запас по умолчанию
-const AMMO_TYPES = {
+export const AMMO_TYPES = {
   luger:   { name: '9×19 мм',    color: '#cfcfcf', start: 60 },
   ae50:    { name: '.50 АЕ',     color: '#ffd34d', start: 21 },
   ak74:    { name: '5,45×39',    color: '#7fd45e', start: 90 },
@@ -13,7 +16,7 @@ const AMMO_TYPES = {
 };
 
 // Арсенал. melee:true — ближний бой, projectile — летящий снаряд
-const WEAPONS = {
+export const WEAPONS = {
   bat:     { name: 'Дубинка',    ammo: null,     damage: 15, fireRate: 600,  melee: true, range: 60,  auto: false },
   knife:   { name: 'Нож',        ammo: null,     damage: 40, fireRate: 400,  melee: true, range: 45,  auto: false, crit: 3 },
   p99:     { name: 'Walter P99', ammo: 'luger',  damage: 12, fireRate: 200,  auto: false, mag: 15, bulletSpeed: 700, quiet: true },
@@ -30,41 +33,58 @@ const WEAPONS = {
 };
 
 // Порядок слотов (клавиши 1..9, 0)
-const WEAPON_ORDER = ['bat', 'knife', 'p99', 'deagle', 'mp5', 'ak74', 'rifle', 'rg6', 'rpg7', 'svd', 'shotgun', 'nailgun', 'flamer'];
+export const WEAPON_ORDER = ['bat', 'knife', 'p99', 'deagle', 'mp5', 'ak74', 'rifle', 'rg6', 'rpg7', 'svd', 'shotgun', 'nailgun', 'flamer'];
 
-class Inventory {
+export class Inventory {
   constructor() {
     this.ammo = {};            // { тип: количество }
     this.owned = new Set(['bat', 'knife']);
     this.current = 'p99';
     this.magazine = {};        // { оружие: патронов в магазине }
-    for (const k in AMMO_TYPES) this.ammo[k] = AMMO_TYPES[k].start;
+    
+    // Инициализируем все типы патронов стартовым значением
+    for (const k in AMMO_TYPES) {
+      this.ammo[k] = AMMO_TYPES[k].start;
+    }
   }
 
   give(weaponId) {
     this.owned.add(weaponId);
     const w = WEAPONS[weaponId];
     if (w.mag && this.magazine[weaponId] === undefined) {
-      this.magazine[weaponId] = Math.min(w.mag, this.ammo[w.ammo] || 0);
-      this.ammo[w.ammo] -= this.magazine[weaponId];
+      // Берем минимум из магазина и доступных патронов
+      const load = Math.min(w.mag, this.ammo[w.ammo] || 0);
+      this.magazine[weaponId] = load;
+      this.ammo[w.ammo] -= load;
     }
   }
 
   select(id) {
-    if (this.owned.has(id)) this.current = id;
+    if (this.owned.has(id)) {
+      this.current = id;
+    }
   }
 
   next() {
     const list = WEAPON_ORDER.filter(id => this.owned.has(id));
-    this.current = list[(list.indexOf(this.current) + 1) % list.length];
+    if (list.length === 0) return; // Защита от пустого списка
+    
+    const currentIndex = list.indexOf(this.current);
+    // Если текущее оружие вдруг не в списке (редкий кейс), берем первое
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % list.length;
+    this.current = list[nextIndex];
   }
 
   // Вернёт true, если выстрел состоялся
   tryShoot() {
     const w = WEAPONS[this.current];
+    
+    // Для оружия ближнего боя всегда возвращаем true (логика удара проверяется отдельно в сцене)
     if (w.melee) return true;
+    
     let mag = this.magazine[this.current] || 0;
     if (mag <= 0) return false;
+    
     this.magazine[this.current] = mag - 1;
     return true;
   }
@@ -72,15 +92,30 @@ class Inventory {
   reload() {
     const w = WEAPONS[this.current];
     if (!w.mag) return;
-    const need = w.mag - (this.magazine[this.current] || 0);
-    const take = Math.min(need, this.ammo[w.ammo] || 0);
+    
+    const currentMag = this.magazine[this.current] || 0;
+    const need = w.mag - currentMag;
+    const available = this.ammo[w.ammo] || 0;
+    
+    const take = Math.min(need, available);
+    
     if (take > 0) {
-      this.magazine[this.current] = (this.magazine[this.current] || 0) + take;
+      this.magazine[this.current] = currentMag + take;
       this.ammo[w.ammo] -= take;
     }
   }
 
   pickupAmmo(type, count) {
-    if (this.ammo[type] !== undefined) this.ammo[type] += count;
+    if (this.ammo[type] !== undefined) {
+      this.ammo[type] += count;
+    }
+  }
+  
+  getAmmoCount(type) {
+    return this.ammo[type] || 0;
+  }
+  
+  getCurrentWeapon() {
+    return WEAPONS[this.current];
   }
 }
